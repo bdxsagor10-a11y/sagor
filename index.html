@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SAGOR HUB Store</title>
+
+    <!-- Telegram SDK -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <!-- Icons & Fonts -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Firebase SDK (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #4285F4;
+            --primary-dark: #3367d6;
+            --bg: #F0F2F5;
+            --card: #FFFFFF;
+            --text: #333333;
+            --text-light: #777777;
+            --shadow: 0 4px 15px rgba(0,0,0,0.05);
+            --radius: 16px;
+        }
+
+        /* Dark Mode Support (Telegram Auto) */
+        body.dark-mode {
+            --bg: #181818;
+            --card: #242424;
+            --text: #ffffff;
+            --text-light: #aaaaaa;
+            --shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: var(--bg); color: var(--text); padding-bottom: 80px; min-height: 100vh; overflow-x: hidden; transition: 0.3s; }
+        
+        /* Utility Classes */
+        .hidden { display: none !important; }
+        .flex-center { display: flex; align-items: center; justify-content: center; }
+        
+        /* Preloader */
+        #preloader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 10000; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: 0.5s; }
+        .loader { width: 50px; height: 50px; border: 5px solid #ddd; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s infinite linear; }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* Auth Screen */
+        .auth-container { height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 30px; text-align: center; }
+        .auth-card { background: var(--card); padding: 30px; border-radius: 20px; box-shadow: var(--shadow); }
+        .input-group { margin-bottom: 15px; text-align: left; }
+        .input-field { width: 100%; padding: 15px; border-radius: 12px; border: 1px solid #ddd; background: var(--bg); color: var(--text); outline: none; font-size: 15px; }
+        
+        /* Buttons */
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-weight: 600; font-size: 15px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:active { transform: scale(0.98); }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; box-shadow: 0 5px 15px rgba(66, 133, 244, 0.3); }
+        .btn-outline { background: transparent; border: 2px solid var(--primary); color: var(--primary); margin-top: 10px; }
+        .btn-danger { background: #ff4d4d; color: white; }
+
+        /* Header */
+        .header { display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; background: var(--card); position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.03); }
+        .logo { font-size: 20px; font-weight: 800; color: var(--primary); }
+        .menu-btn { font-size: 24px; cursor: pointer; }
+
+        /* Search */
+        .search-wrapper { padding: 15px 20px 5px; }
+        .search-box { display: flex; align-items: center; background: var(--card); padding: 12px 15px; border-radius: 50px; box-shadow: var(--shadow); }
+        .search-box input { border: none; background: transparent; width: 100%; margin-left: 10px; outline: none; color: var(--text); font-size: 15px; }
+
+        /* Slider */
+        .slider-wrapper { padding: 15px 20px; }
+        .slider-container { width: 100%; aspect-ratio: 16/9; border-radius: var(--radius); overflow: hidden; position: relative; box-shadow: var(--shadow); background: #ddd; }
+        .slide { width: 100%; height: 100%; object-fit: cover; position: absolute; opacity: 0; transition: opacity 0.5s; }
+        .slide.active { opacity: 1; }
+
+        /* Grid Items */
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; padding: 10px 20px 20px; }
+        .item-card { background: var(--card); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); transition: transform 0.2s; cursor: pointer; border: 1px solid rgba(0,0,0,0.05); }
+        .item-card:hover { transform: translateY(-3px); }
+        .item-thumb { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
+        .item-info { padding: 12px; }
+        .item-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 5px; }
+        .item-badge { font-size: 10px; background: #E8F0FE; color: var(--primary); padding: 3px 8px; border-radius: 50px; font-weight: 600; }
+
+        /* Sidebar */
+        .sidebar { position: fixed; top: 0; left: -280px; width: 280px; height: 100%; background: var(--card); z-index: 2000; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 5px 0 15px rgba(0,0,0,0.1); padding-top: 60px; }
+        .sidebar.active { left: 0; }
+        .sidebar-item { padding: 15px 25px; font-size: 16px; font-weight: 500; display: flex; align-items: center; gap: 15px; cursor: pointer; transition: 0.2s; color: var(--text); }
+        .sidebar-item:hover { background: var(--bg); color: var(--primary); }
+        .sidebar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1500; display: none; }
+        .sidebar-overlay.active { display: block; }
+
+        /* Details & Custom Page */
+        .page-container { padding: 20px; max-width: 600px; margin: 0 auto; }
+        .hero-img { width: 100%; border-radius: var(--radius); margin-bottom: 20px; box-shadow: var(--shadow); }
+        .desc-box { background: var(--card); padding: 20px; border-radius: var(--radius); margin-top: 20px; line-height: 1.6; font-size: 14px; color: var(--text-light); box-shadow: var(--shadow); }
+
+        /* KEY VIEWER STYLES */
+        #key-view {
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: fixed; top:0; left:0; width:100%; z-index: 5000;
+        }
+        .key-card {
+            background: white; padding: 40px 30px; border-radius: 25px;
+            text-align: center; width: 90%; max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .key-logo { width: 80px; height: 80px; border-radius: 20px; margin-bottom: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .pass-display { font-size: 24px; font-weight: 800; letter-spacing: 3px; margin: 20px 0; color: #333; }
+    </style>
+</head>
+<body>
+
+    <!-- PRELOADER -->
+    <div id="preloader">
+        <div class="loader"></div>
+        <h4 style="margin-top:20px; color:var(--primary);">SAGOR HUB</h4>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar">
+        <div style="padding: 0 25px 30px;">
+            <h2 style="color:var(--primary); font-weight:800;">MENU</h2>
+            <p id="menu-user-email" style="font-size:12px; color:var(--text-light);">Guest</p>
+        </div>
+        <div class="sidebar-item" onclick="nav('home')"><i class="fas fa-home"></i> Home Store</div>
+        <div class="sidebar-item" onclick="nav('custom')"><i class="fas fa-gift"></i> Custom Request</div>
+        <div class="sidebar-item" onclick="nav('profile')"><i class="fas fa-user"></i> My Profile</div>
+        <div class="sidebar-item" style="color:#ff4d4d; margin-top:auto;" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Logout</div>
+    </div>
+
+    <!-- 1. AUTH PAGE -->
+    <div id="page-auth" class="auth-container hidden">
+        <div class="auth-card">
+            <h2 style="color:var(--primary); margin-bottom:10px;">Welcome Back</h2>
+            <p style="margin-bottom:20px; color:var(--text-light);">Sign in to continue</p>
+            
+            <div id="tg-login-msg" class="hidden" style="color:green; margin-bottom:15px; font-weight:600;">
+                <i class="fab fa-telegram"></i> Telegram Detected! Logging in...
+            </div>
+
+            <div id="email-forms">
+                <div class="input-group">
+                    <input type="email" id="login-email" class="input-field" placeholder="Email Address">
+                </div>
+                <div class="input-group">
+                    <input type="password" id="login-pass" class="input-field" placeholder="Password">
+                </div>
+                <button class="btn btn-primary" onclick="emailLogin()">Login</button>
+                <button class="btn btn-outline" onclick="toggleAuthMode()">Create Account</button>
+            </div>
+            
+            <div id="reg-forms" class="hidden">
+                <div class="input-group">
+                    <input type="email" id="reg-email" class="input-field" placeholder="New Email">
+                </div>
+                <div class="input-group">
+                    <input type="password" id="reg-pass" class="input-field" placeholder="New Password">
+                </div>
+                <button class="btn btn-primary" onclick="emailRegister()">Register</button>
+                <button class="btn btn-outline" onclick="toggleAuthMode()">Back to Login</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. HOME STORE PAGE -->
+    <div id="page-home" class="hidden">
+        <div class="header">
+            <div class="logo">SAGOR HUB</div>
+            <div class="menu-btn" onclick="toggleSidebar()"><i class="fas fa-bars"></i></div>
+        </div>
+
+        <div class="search-wrapper">
+            <div class="search-box">
+                <i class="fas fa-search" style="color:#aaa;"></i>
+                <input type="text" id="search-input" placeholder="Search items..." onkeyup="filterItems()">
+            </div>
+        </div>
+
+        <div class="slider-wrapper">
+            <div class="slider-container" id="slider-box"></div>
+        </div>
+
+        <h3 style="padding: 10px 20px 0; font-size: 16px;">New Arrivals</h3>
+        <div class="grid-container" id="item-grid"></div>
+    </div>
+
+    <!-- 3. DETAILS PAGE -->
+    <div id="page-details" class="hidden">
+        <div class="header">
+            <div class="menu-btn" onclick="nav('home')"><i class="fas fa-arrow-left"></i></div>
+            <div style="font-weight:600;">Details</div>
+            <div style="width:24px;"></div>
+        </div>
+        <div class="page-container">
+            <img id="dt-img" class="hero-img">
+            <h2 id="dt-title" style="line-height:1.3;">Title</h2>
+            <div style="margin: 10px 0;">
+                <span class="item-badge" id="dt-ver">v1.0</span>
+                <span class="item-badge" id="dt-owner">Admin</span>
+            </div>
+
+            <div style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn btn-primary" onclick="openPremium()"><i class="fas fa-crown"></i> Premium</button>
+                <button class="btn btn-outline" style="margin-top:0;" onclick="goToDownload()"><i class="fas fa-download"></i> Free</button>
+            </div>
+
+            <div class="desc-box">
+                <h4>Description</h4>
+                <p id="dt-desc" style="margin-top:10px;">...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. DOWNLOAD PAGE -->
+    <div id="page-download" class="hidden">
+        <div class="header">
+            <div class="menu-btn" onclick="nav('details')"><i class="fas fa-arrow-left"></i></div>
+            <div style="font-weight:600;">Downloads</div>
+            <div style="width:24px;"></div>
+        </div>
+        <div class="page-container" style="text-align:center;">
+            <h3 style="margin-bottom:20px;">Available Links</h3>
+            <div id="dl-buttons-area"></div>
+        </div>
+    </div>
+
+    <!-- 5. PROFILE PAGE -->
+    <div id="page-profile" class="hidden">
+        <div class="header">
+            <div class="menu-btn" onclick="nav('home')"><i class="fas fa-arrow-left"></i></div>
+            <div style="font-weight:600;">Profile</div>
+            <div style="width:24px;"></div>
+        </div>
+        <div class="page-container" style="text-align:center; padding-top:40px;">
+            <div style="width:100px; height:100px; background:#E8F0FE; color:var(--primary); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:40px; margin:0 auto 20px;">
+                <i class="fas fa-user"></i>
+            </div>
+            <h3 id="prof-name">User Name</h3>
+            <p id="prof-email" style="color:var(--text-light);">...</p>
+            <br>
+            <button class="btn btn-danger" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <!-- 6. CUSTOM REQUEST PAGE -->
+    <div id="page-custom" class="hidden">
+        <div class="header">
+            <div class="menu-btn" onclick="nav('home')"><i class="fas fa-arrow-left"></i></div>
+            <div style="font-weight:600;">Custom Request</div>
+            <div style="width:24px;"></div>
+        </div>
+        <div class="page-container">
+            <a href="https://postimages.org/" target="_blank" class="btn btn-outline" style="border-style:dashed; margin-bottom:20px;">
+                <i class="fas fa-cloud-upload-alt"></i> Upload Image First
+            </a>
+            
+            <div class="input-group">
+                <input type="text" id="c-photo" class="input-field" placeholder="Paste Image Link">
+            </div>
+            <div class="input-group">
+                <input type="text" id="c-name" class="input-field" placeholder="Your Name">
+            </div>
+            <div class="input-group">
+                <input type="text" id="c-country" class="input-field" placeholder="Your Country">
+            </div>
+            
+            <button class="btn btn-primary" onclick="submitCustom()">Submit Request</button>
+        </div>
+    </div>
+
+    <!-- 7. KEY VIEWER (Overlay) -->
+    <div id="key-view" class="hidden">
+        <div class="key-card">
+            <img id="k-logo" class="key-logo" src="https://via.placeholder.com/80">
+            <h3 id="k-name" style="margin-bottom:5px;">App Name</h3>
+            <span class="item-badge" id="k-ver">v1.0</span>
+            
+            <div id="k-unlock-area" style="margin-top:25px;">
+                <button class="btn btn-primary" onclick="handleKeyLogic()">
+                    <i class="fas fa-lock-open"></i> UNLOCK NOW
+                </button>
+            </div>
+
+            <div id="k-pass-area" class="hidden" style="margin-top:20px;">
+                <p style="color:#777; font-size:12px;">PASSWORD</p>
+                <div class="pass-display" id="k-pass-txt">...</div>
+                <button class="btn btn-outline" onclick="copyPass()">Copy</button>
+            </div>
+
+            <div style="display:flex; justify-content:center; gap:15px; margin-top:25px;">
+                <a id="k-yt" href="#" target="_blank" style="color:red; font-size:24px;"><i class="fab fa-youtube"></i></a>
+                <a id="k-tg" href="#" target="_blank" style="color:#0088cc; font-size:24px;"><i class="fab fa-telegram"></i></a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. FIREBASE CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAsw-zK0thQk-eXc5PeyIv99bTvrmoLvrQ",
+            authDomain: "topup-store-28b23.firebaseapp.com",
+            databaseURL: "https://topup-store-28b23-default-rtdb.firebaseio.com",
+            projectId: "topup-store-28b23",
+            storageBucket: "topup-store-28b23.firebasestorage.app",
+            messagingSenderId: "869779143511",
+            appId: "1:869779143511:web:222f95922961a9cf8a1c12",
+            measurementId: "G-ZWTEG3NQEL"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const tg = window.Telegram.WebApp;
+
+        // --- 2. GLOBAL STATE ---
+        let allItems = [];
+        window.currentItem = null;
+        window.currentKeyPage = null;
+
+        // --- 3. INIT ---
+        window.onload = function() {
+            tg.expand();
+            
+            // Check Dark Mode
+            if (tg.colorScheme === 'dark') document.body.classList.add('dark-mode');
+
+            // Route Check (Key vs App)
+            const params = new URLSearchParams(window.location.search);
+            const pageSlug = params.get('page');
+
+            if(pageSlug) {
+                // Key Mode
+                document.getElementById('preloader').style.display = 'none';
+                loadKeyPage(pageSlug);
+            } else {
+                // App Mode - Check Auth
+                if(tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                    handleTelegramLogin(tg.initDataUnsafe.user);
+                } else {
+                    auth.onAuthStateChanged(user => {
+                        document.getElementById('preloader').style.display = 'none';
+                        if(user) initApp(user);
+                        else nav('auth');
+                    });
+                }
+            }
+        };
+
+        // --- 4. AUTH LOGIC ---
+        async function handleTelegramLogin(tgUser) {
+            document.getElementById('preloader').style.display = 'none';
+            document.getElementById('tg-login-msg').classList.remove('hidden');
+            document.getElementById('email-forms').classList.add('hidden');
+            nav('auth'); // Show Auth screen briefly while logging in
+
+            const userRef = db.collection('users').doc(String(tgUser.id));
+            try {
+                // Update or Create User
+                await userRef.set({
+                    username: tgUser.username || '',
+                    first_name: tgUser.first_name,
+                    id: tgUser.id,
+                    role: 'user',
+                    platform: 'telegram',
+                    last_seen: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+
+                const fakeUser = { 
+                    email: tgUser.first_name, 
+                    uid: String(tgUser.id),
+                    isTg: true 
+                };
+                initApp(fakeUser);
+            } catch (e) {
+                Swal.fire('Login Error', e.message, 'error');
+                document.getElementById('email-forms').classList.remove('hidden');
+            }
+        }
+
+        function emailLogin() {
+            const e = document.getElementById('login-email').value;
+            const p = document.getElementById('login-pass').value;
+            if(!e || !p) return Swal.fire('Error', 'Fill all fields', 'warning');
+            auth.signInWithEmailAndPassword(e, p).catch(err => Swal.fire('Error', err.message, 'error'));
+        }
+
+        function emailRegister() {
+            const e = document.getElementById('reg-email').value;
+            const p = document.getElementById('reg-pass').value;
+            if(!e || !p) return Swal.fire('Error', 'Fill all fields', 'warning');
+            auth.createUserWithEmailAndPassword(e, p).then(cred => {
+                db.collection('users').doc(cred.user.uid).set({ email: e, role: 'user', platform: 'web' });
+            }).catch(err => Swal.fire('Error', err.message, 'error'));
+        }
+
+        function toggleAuthMode() {
+            document.getElementById('email-forms').classList.toggle('hidden');
+            document.getElementById('reg-forms').classList.toggle('hidden');
+        }
+
+        function logout() {
+            auth.signOut();
+            window.location.reload();
+        }
+
+        function initApp(user) {
+            document.getElementById('prof-name').innerText = user.email || user.uid;
+            document.getElementById('prof-email').innerText = "ID: " + user.uid;
+            document.getElementById('menu-user-email').innerText = user.email || user.uid;
+            
+            loadSliders();
+            loadItems();
+            nav('home');
+        }
+
+        // --- 5. DATA LOADING ---
+        async function loadItems() {
+            const grid = document.getElementById('item-grid');
+            grid.innerHTML = '<p style="text-align:center; width:200%; margin-top:20px;">Loading Items...</p>';
+            
+            try {
+                const snap = await db.collection('items').orderBy('created_at', 'desc').get();
+                allItems = [];
+                grid.innerHTML = '';
+                
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    data.id = doc.id;
+                    allItems.push(data);
+                    
+                    const div = document.createElement('div');
+                    div.className = 'item-card';
+                    div.onclick = () => openDetails(data);
+                    div.innerHTML = `
+                        <img src="${data.icon || data.thumb}" class="item-thumb" onerror="this.src='https://via.placeholder.com/150'">
+                        <div class="item-info">
+                            <div class="item-title">${data.title}</div>
+                            <span class="item-badge">${data.version || 'New'}</span>
+                        </div>
+                    `;
+                    grid.appendChild(div);
+                });
+
+                if(allItems.length === 0) grid.innerHTML = '<p style="padding:20px;">No items found.</p>';
+            } catch (e) {
+                console.error(e);
+                grid.innerHTML = '<p style="color:red;">Failed to load data.</p>';
+            }
+        }
+
+        async function loadSliders() {
+            const box = document.getElementById('slider-box');
+            try {
+                const snap = await db.collection('sliders').get();
+                let html = '';
+                let i = 0;
+                snap.forEach(doc => {
+                    const s = doc.data();
+                    html += `<img src="${s.img}" class="slide ${i===0?'active':''}" onclick="if('${s.link}') window.open('${s.link}')">`;
+                    i++;
+                });
+                if(i > 0) {
+                    box.innerHTML = html;
+                    startSlider();
+                } else {
+                    box.innerHTML = `<img src="https://via.placeholder.com/600x300?text=SAGOR+HUB" class="slide active">`;
+                }
+            } catch(e) {}
+        }
+
+        function startSlider() {
+            const slides = document.querySelectorAll('.slide');
+            if(slides.length < 2) return;
+            let i = 0;
+            setInterval(() => {
+                slides[i].classList.remove('active');
+                i = (i + 1) % slides.length;
+                slides[i].classList.add('active');
+            }, 3500);
+        }
+
+        // --- 6. NAVIGATION & PAGES ---
+        function nav(pageId) {
+            document.querySelectorAll('body > div[id^="page-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById('page-' + pageId).classList.remove('hidden');
+            document.querySelector('.sidebar').classList.remove('active');
+            document.querySelector('.sidebar-overlay').classList.remove('active');
+            window.scrollTo(0, 0);
+        }
+
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('active');
+            document.querySelector('.sidebar-overlay').classList.toggle('active');
+        }
+
+        function openDetails(item) {
+            window.currentItem = item;
+            document.getElementById('dt-img').src = item.thumb;
+            document.getElementById('dt-title').innerText = item.title;
+            document.getElementById('dt-ver').innerText = "Version: " + (item.version || '1.0');
+            document.getElementById('dt-owner').innerText = "Owner: " + (item.owner || 'Admin');
+            document.getElementById('dt-desc').innerText = item.description || "No description.";
+            nav('details');
+        }
+
+        function goToDownload() {
+            const item = window.currentItem;
+            if(!item) return;
+            const area = document.getElementById('dl-buttons-area');
+            area.innerHTML = '';
+
+            let btns = item.buttons;
+            // Handle legacy JSON string format if present
+            if(typeof btns === 'string') { try{ btns = JSON.parse(btns); } catch(e){ btns=[]; } }
+
+            if(btns && btns.length > 0) {
+                btns.forEach(b => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-primary';
+                    btn.style.marginBottom = '10px';
+                    btn.innerHTML = `<i class="fas fa-download"></i> ${b.label}`;
+                    btn.onclick = () => handleSmartLink(item.smart_link, b.link, item.id, item.click_limit);
+                    area.appendChild(btn);
+                });
+            } else {
+                area.innerHTML = '<p>No download links available.</p>';
+            }
+            nav('download');
+        }
+
+        function openPremium() {
+            if(window.currentItem && window.currentItem.premiumLink) {
+                window.open(window.currentItem.premiumLink, '_blank');
+            } else {
+                Swal.fire('Oops', 'Premium link not set.', 'info');
+            }
+        }
+
+        function filterItems() {
+            const q = document.getElementById('search-input').value.toLowerCase();
+            const grid = document.getElementById('item-grid');
+            grid.innerHTML = '';
+            allItems.filter(i => i.title.toLowerCase().includes(q)).forEach(data => {
+                const div = document.createElement('div');
+                div.className = 'item-card';
+                div.onclick = () => openDetails(data);
+                div.innerHTML = `
+                    <img src="${data.icon || data.thumb}" class="item-thumb">
+                    <div class="item-info">
+                        <div class="item-title">${data.title}</div>
+                        <span class="item-badge">${data.version || 'v1.0'}</span>
+                    </div>
+                `;
+                grid.appendChild(div);
+            });
+        }
+
+        // --- 7. CUSTOM REQUEST ---
+        async function submitCustom() {
+            const p = document.getElementById('c-photo').value;
+            const n = document.getElementById('c-name').value;
+            const c = document.getElementById('c-country').value;
+            
+            if(!p || !n || !c) return Swal.fire('Error', 'Fill all fields', 'warning');
+            
+            try {
+                await db.collection('custom_submissions').add({
+                    photo_link: p, user_name: n, country: c, 
+                    created_at: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                Swal.fire('Success', 'Request Submitted!', 'success');
+                document.getElementById('c-photo').value = '';
+            } catch(e) {
+                Swal.fire('Error', e.message, 'error');
+            }
+        }
+
+        // --- 8. KEY VIEWER LOGIC ---
+        async function loadKeyPage(slug) {
+            document.querySelectorAll('body > div').forEach(el => el.classList.add('hidden'));
+            document.getElementById('key-view').classList.remove('hidden');
+            
+            try {
+                const snap = await db.collection('key_pages').where('page_slug', '==', slug).limit(1).get();
+                if(snap.empty) {
+                    Swal.fire('Error', 'Key Page Not Found', 'error');
+                    return;
+                }
+                const data = snap.docs[0].data();
+                window.currentKeyPage = data;
+
+                document.getElementById('k-name').innerText = data.app_name;
+                document.getElementById('k-logo').src = data.app_logo;
+                document.getElementById('k-ver').innerText = "v" + data.app_version;
+                document.getElementById('k-yt').href = data.youtube_link;
+                document.getElementById('k-tg').href = data.telegram_link;
+            } catch(e) {
+                console.error(e);
+            }
+        }
+
+        async function handleKeyLogic() {
+            const data = window.currentKeyPage;
+            // 1. Smart Link Logic
+            if(data.smart_link) {
+                let k = 'kp_' + data.page_slug;
+                let c = parseInt(localStorage.getItem(k) || '0');
+                if(c < (parseInt(data.click_target) || 3)) {
+                    localStorage.setItem(k, c + 1);
+                    window.open(data.smart_link, '_blank');
+                    return;
+                } else {
+                    localStorage.setItem(k, 0); // Reset
+                }
+            }
+
+            // 2. Action (Download or Password)
+            if(data.download_link) {
+                window.open(data.download_link, '_blank');
+            } else if(data.sheet_id) {
+                // Fetch from Google Sheet
+                const btn = document.querySelector('#k-unlock-area button');
+                btn.innerHTML = 'Verifying...';
+                try {
+                    const url = `https://docs.google.com/spreadsheets/d/${data.sheet_id}/gviz/tq?tqx=out:json`;
+                    const res = await fetch(url);
+                    const txt = await res.text();
+                    const json = JSON.parse(txt.substring(47).slice(0, -2));
+                    const pass = json.table.rows[0].c[0].v;
+                    
+                    document.getElementById('k-unlock-area').classList.add('hidden');
+                    document.getElementById('k-pass-area').classList.remove('hidden');
+                    document.getElementById('k-pass-txt').innerText = pass;
+                } catch(e) {
+                    Swal.fire('Error', 'Cannot fetch password. Check Sheet ID.', 'error');
+                    btn.innerHTML = 'UNLOCK NOW';
+                }
+            }
+        }
+
+        function copyPass() {
+            navigator.clipboard.writeText(document.getElementById('k-pass-txt').innerText);
+            Swal.fire({icon: 'success', title: 'Copied!', toast: true, position: 'top', timer: 1500, showConfirmButton: false});
+        }
+
+        function handleSmartLink(smart, target, id, limit) {
+            if(!smart) { window.open(target, '_blank'); return; }
+            let k = 'sl_' + id;
+            let c = parseInt(localStorage.getItem(k) || '0');
+            if(c < (limit || 3)) {
+                localStorage.setItem(k, c + 1);
+                window.open(smart, '_blank');
+            } else {
+                localStorage.setItem(k, 0);
+                window.open(target, '_blank');
+            }
+        }
+    </script>
+</body>
+</html>
